@@ -4,31 +4,38 @@ import com.example.userapi.dto.request.CreateUserRequest;
 import com.example.userapi.dto.request.UpdateUserRequest;
 import com.example.userapi.entity.Role;
 import com.example.userapi.entity.User;
+import com.example.userapi.entity.UserRole;
 import com.example.userapi.enums.AuditEventType;
 import com.example.userapi.exception.DuplicateResourceException;
 import com.example.userapi.exception.ResourceNotFoundException;
 import com.example.userapi.repository.RoleRepository;
 import com.example.userapi.repository.UserRepository;
+import com.example.userapi.repository.UserRoleRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final UserRoleRepository userRoleRepository;
     private final AuditLogService auditLogService;
 
     public UserService(UserRepository userRepository,
                        RoleRepository roleRepository,
+                       UserRoleRepository userRoleRepository,
                        AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
+        this.userRoleRepository = userRoleRepository;
         this.auditLogService = auditLogService;
     }
 
@@ -108,15 +115,25 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
-        Set<Role> roles = new HashSet<>(roleRepository.findAllById(roleIds));
+        List<Role> roles = roleRepository.findAllById(roleIds);
         if (roles.size() != roleIds.size()) {
             throw new ResourceNotFoundException("Role", "ids", roleIds);
         }
 
-        user.setRoles(roles);
-        User updated = userRepository.save(user);
-        auditLogService.log(updated, AuditEventType.ROLE_CHANGE,
+        userRoleRepository.deleteByUserId(userId);
+
+        Set<UserRole> userRoles = roles.stream().map(role -> {
+            UserRole userRole = new UserRole();
+            userRole.setUser(user);
+            userRole.setRole(role);
+            return userRole;
+        }).collect(Collectors.toSet());
+
+        userRoleRepository.saveAll(userRoles);
+        user.setRoles(userRoles);
+
+        auditLogService.log(user, AuditEventType.ROLE_CHANGE,
                 "Roles assigned: " + roleIds);
-        return updated;
+        return user;
     }
 }

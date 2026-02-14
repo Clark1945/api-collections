@@ -1,8 +1,9 @@
 package com.example.userapi.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "roles")
@@ -13,6 +14,9 @@ public class Role extends BaseEntity {
 
     @Column(name = "description", length = 255)
     private String description;
+
+    @OneToMany(mappedBy = "role", fetch = FetchType.EAGER)
+    private Set<UserRole> userRoles = new HashSet<>();
 
     public String getName() {
         return name;

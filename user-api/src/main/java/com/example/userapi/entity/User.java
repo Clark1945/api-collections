@@ -1,15 +1,10 @@
 package com.example.userapi.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Entity
@@ -46,13 +41,9 @@ public class User extends BaseEntity {
     @Column(name = "last_login_ip", length = 45)
     private String lastLoginIp;
 
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "user_roles",
-            joinColumns = @JoinColumn(name = "user_id"),
-            inverseJoinColumns = @JoinColumn(name = "role_id")
-    )
-    private Set<Role> roles = new HashSet<>();
+    // TODO 未來將有優化空間 用 @EntityGraph 或 JOIN FETCH
+    @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.REMOVE)
+    Set<UserRole> userRoles = new HashSet<>();
 
     public String getUsername() {
         return username;
@@ -134,11 +125,11 @@ public class User extends BaseEntity {
         this.lastLoginIp = lastLoginIp;
     }
 
-    public Set<Role> getRoles() {
-        return roles;
+    public Set<UserRole> getRoles() {
+        return userRoles;
     }
 
-    public void setRoles(Set<Role> roles) {
-        this.roles = roles;
+    public void setRoles(Set<UserRole> userRoles) {
+        this.userRoles = userRoles;
     }
 }

@@ -34,9 +34,11 @@ public class UserResponse {
         response.setLocked(user.isLocked());
         response.setLastLoginAt(user.getLastLoginAt());
         response.setLastLoginIp(user.getLastLoginIp());
-        response.setRoles(user.getRoles().stream()
-                .map(RoleResponse::from)
-                .collect(Collectors.toSet()));
+        response.setRoles(
+                user.getRoles().stream()
+                .map(role -> RoleResponse.from(role.getRole()))
+                .collect(Collectors.toSet())
+        );
         response.setCreatedAt(user.getCreatedAt());
         response.setUpdatedAt(user.getUpdatedAt());
         return response;
