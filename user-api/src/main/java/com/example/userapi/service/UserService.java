@@ -1,5 +1,6 @@
 package com.example.userapi.service;
 
+import com.example.userapi.aspect.Auditable;
 import com.example.userapi.dto.request.CreateUserRequest;
 import com.example.userapi.dto.request.UpdateUserRequest;
 import com.example.userapi.entity.Role;
@@ -9,7 +10,6 @@ import com.example.userapi.enums.AuditEventType;
 import com.example.userapi.enums.UserStatus;
 import com.example.userapi.exception.DuplicateResourceException;
 import com.example.userapi.exception.ResourceNotFoundException;
-import com.example.userapi.repository.AuditLogRepository;
 import com.example.userapi.repository.RoleRepository;
 import com.example.userapi.repository.UserRepository;
 import com.example.userapi.repository.UserRoleRepository;
@@ -20,7 +20,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -31,23 +30,18 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
-    private final AuditLogService auditLogService;
-    private final AuditLogRepository auditLogRepository;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UserService(UserRepository userRepository,
                        RoleRepository roleRepository,
-                       UserRoleRepository userRoleRepository,
-                       AuditLogService auditLogService,
-                       AuditLogRepository auditLogRepository) {
+                       UserRoleRepository userRoleRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.userRoleRepository = userRoleRepository;
-        this.auditLogService = auditLogService;
-        this.auditLogRepository = auditLogRepository;
     }
 
     @Transactional
+    @Auditable(eventType = AuditEventType.ACCOUNT_CREATED)
     public User createUser(CreateUserRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new DuplicateResourceException("User", "username", request.getUsername());
@@ -63,10 +57,9 @@ public class UserService {
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setPhone(request.getPhone());
+        user.setStatus(UserStatus.ENABLED);
 
-        User saved = userRepository.save(user);
-        auditLogService.log(saved, AuditEventType.ACCOUNT_CREATED, null);
-        return saved;
+        return userRepository.save(user);
     }
 
     @Transactional(readOnly = true)
@@ -81,6 +74,7 @@ public class UserService {
     }
 
     @Transactional
+    @Auditable(eventType = AuditEventType.ACCOUNT_UPDATED)
     public User updateUser(Long id, UpdateUserRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
@@ -106,20 +100,20 @@ public class UserService {
             if(!user.setEnabled(request.getEnabled())) throw new IllegalStateException("Cannot change enabled status while user is " + user.getStatus());
         }
 
-        User updated = userRepository.save(user);
-        auditLogService.log(updated, AuditEventType.ACCOUNT_UPDATED, null);
-        return updated;
+        return userRepository.save(user);
     }
 
     @Transactional
-    public void deleteUser(Long id) {
+    @Auditable(eventType = AuditEventType.ACCOUNT_DISABLED)
+    public User deleteUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
         user.setStatus(UserStatus.DISABLED);
-        userRepository.save(user);
+        return userRepository.save(user);
     }
 
     @Transactional
+    @Auditable(eventType = AuditEventType.ROLE_CHANGE, detail = "'Roles assigned: ' + #args[1]")
     public User assignRoles(Long userId, Set<Long> roleIds) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
@@ -141,8 +135,6 @@ public class UserService {
         userRoleRepository.saveAll(userRoles);
         user.setRoles(userRoles);
 
-        auditLogService.log(user, AuditEventType.ROLE_CHANGE,
-                "Roles assigned: " + roleIds);
         return user;
     }
 }
