@@ -1,6 +1,7 @@
 package com.example.userapi.dto.response;
 
 import com.example.userapi.entity.User;
+import com.example.userapi.enums.UserStatus;
 
 import java.time.Instant;
 import java.util.Set;
@@ -14,8 +15,7 @@ public class UserResponse {
     private String firstName;
     private String lastName;
     private String phone;
-    private boolean enabled;
-    private boolean locked;
+    private UserStatus status;
     private Instant lastLoginAt;
     private String lastLoginIp;
     private Set<RoleResponse> roles;
@@ -30,8 +30,7 @@ public class UserResponse {
         response.setFirstName(user.getFirstName());
         response.setLastName(user.getLastName());
         response.setPhone(user.getPhone());
-        response.setEnabled(user.isEnabled());
-        response.setLocked(user.isLocked());
+        response.setStatus(user.getStatus());
         response.setLastLoginAt(user.getLastLoginAt());
         response.setLastLoginIp(user.getLastLoginIp());
         response.setRoles(
@@ -92,20 +91,12 @@ public class UserResponse {
         this.phone = phone;
     }
 
-    public boolean isEnabled() {
-        return enabled;
+    public UserStatus getStatus() {
+        return status;
     }
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public boolean isLocked() {
-        return locked;
-    }
-
-    public void setLocked(boolean locked) {
-        this.locked = locked;
+    public void setStatus(UserStatus status) {
+        this.status = status;
     }
 
     public Instant getLastLoginAt() {

@@ -1,11 +1,14 @@
 package com.example.userapi.entity;
 
+import com.example.userapi.enums.UserStatus;
 import jakarta.persistence.*;
 
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import static com.example.userapi.enums.UserStatus.*;
 
 @Entity
 @Table(name = "users")
@@ -29,11 +32,9 @@ public class User extends BaseEntity {
     @Column(name = "phone", length = 20)
     private String phone;
 
-    @Column(name = "enabled", nullable = false)
-    private boolean enabled = false;
-
-    @Column(name = "locked", nullable = false)
-    private boolean locked = false;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 30)
+    private UserStatus status = PENDING;
 
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
@@ -44,6 +45,14 @@ public class User extends BaseEntity {
     // TODO 未來將有優化空間 用 @EntityGraph 或 JOIN FETCH
     @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.REMOVE)
     Set<UserRole> userRoles = new HashSet<>();
+
+    public UserStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(UserStatus status) {
+        this.status = status;
+    }
 
     public String getUsername() {
         return username;
@@ -94,19 +103,17 @@ public class User extends BaseEntity {
     }
 
     public boolean isEnabled() {
-        return enabled;
+        return status == UserStatus.ENABLED;
     }
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+    public boolean setEnabled(boolean enabled) {
+        if (this.status == LOCKED || this.status == PENDING) return false;
+        this.status = enabled ? ENABLED : DISABLED;
+        return true;
     }
 
     public boolean isLocked() {
-        return locked;
-    }
-
-    public void setLocked(boolean locked) {
-        this.locked = locked;
+        return status == UserStatus.LOCKED;
     }
 
     public Instant getLastLoginAt() {

@@ -15,7 +15,7 @@ public class Role extends BaseEntity {
     @Column(name = "description", length = 255)
     private String description;
 
-    @OneToMany(mappedBy = "role", fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "role", fetch = FetchType.EAGER, cascade = CascadeType.REMOVE)
     private Set<UserRole> userRoles = new HashSet<>();
 
     public String getName() {

@@ -6,13 +6,17 @@ import com.example.userapi.entity.Role;
 import com.example.userapi.entity.User;
 import com.example.userapi.entity.UserRole;
 import com.example.userapi.enums.AuditEventType;
+import com.example.userapi.enums.UserStatus;
 import com.example.userapi.exception.DuplicateResourceException;
 import com.example.userapi.exception.ResourceNotFoundException;
+import com.example.userapi.repository.AuditLogRepository;
 import com.example.userapi.repository.RoleRepository;
 import com.example.userapi.repository.UserRepository;
 import com.example.userapi.repository.UserRoleRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,15 +32,19 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final AuditLogService auditLogService;
+    private final AuditLogRepository auditLogRepository;
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UserService(UserRepository userRepository,
                        RoleRepository roleRepository,
                        UserRoleRepository userRoleRepository,
-                       AuditLogService auditLogService) {
+                       AuditLogService auditLogService,
+                       AuditLogRepository auditLogRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.userRoleRepository = userRoleRepository;
         this.auditLogService = auditLogService;
+        this.auditLogRepository = auditLogRepository;
     }
 
     @Transactional
@@ -51,7 +59,7 @@ public class UserService {
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
-        user.setPassword(request.getPassword());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setPhone(request.getPhone());
@@ -63,12 +71,12 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public Page<User> getAllUsers(Pageable pageable) {
-        return userRepository.findAll(pageable);
+        return userRepository.findByStatusNot(UserStatus.DISABLED, pageable);
     }
 
     @Transactional(readOnly = true)
     public User getUserById(Long id) {
-        return userRepository.findById(id)
+        return userRepository.findByIdAndStatusNot(id, UserStatus.DISABLED)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
     }
 
@@ -95,7 +103,7 @@ public class UserService {
             user.setPhone(request.getPhone());
         }
         if (request.getEnabled() != null) {
-            user.setEnabled(request.getEnabled());
+            if(!user.setEnabled(request.getEnabled())) throw new IllegalStateException("Cannot change enabled status while user is " + user.getStatus());
         }
 
         User updated = userRepository.save(user);
@@ -107,7 +115,8 @@ public class UserService {
     public void deleteUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
-        userRepository.delete(user);
+        user.setStatus(UserStatus.DISABLED);
+        userRepository.save(user);
     }
 
     @Transactional
