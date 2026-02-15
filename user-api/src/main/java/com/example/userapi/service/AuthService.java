@@ -4,7 +4,6 @@ import com.example.userapi.entity.User;
 import com.example.userapi.enums.AuditEventType;
 import com.example.userapi.exception.AuthenticationException;
 import com.example.userapi.repository.UserRepository;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,11 +15,13 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
-    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final PasswordEncoder passwordEncoder;
 
-    public AuthService(UserRepository userRepository, AuditLogService auditLogService) {
+    public AuthService(UserRepository userRepository, AuditLogService auditLogService,
+                       PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.auditLogService = auditLogService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional

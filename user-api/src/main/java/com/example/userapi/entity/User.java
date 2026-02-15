@@ -1,5 +1,6 @@
 package com.example.userapi.entity;
 
+import com.example.userapi.enums.AuthProvider;
 import com.example.userapi.enums.UserStatus;
 import jakarta.persistence.*;
 
@@ -20,7 +21,7 @@ public class User extends BaseEntity {
     @Column(name = "email", nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(name = "password", nullable = false, length = 255)
+    @Column(name = "password", length = 255)
     private String password;
 
     @Column(name = "first_name", length = 50)
@@ -41,6 +42,13 @@ public class User extends BaseEntity {
 
     @Column(name = "last_login_ip", length = 45)
     private String lastLoginIp;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider", nullable = false, length = 20)
+    private AuthProvider provider = AuthProvider.LOCAL;
+
+    @Column(name = "provider_id", length = 255)
+    private String providerId;
 
     // TODO 未來將有優化空間 用 @EntityGraph 或 JOIN FETCH
     @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.REMOVE)
@@ -138,5 +146,21 @@ public class User extends BaseEntity {
 
     public void setRoles(Set<UserRole> userRoles) {
         this.userRoles = userRoles;
+    }
+
+    public AuthProvider getProvider() {
+        return provider;
+    }
+
+    public void setProvider(AuthProvider provider) {
+        this.provider = provider;
+    }
+
+    public String getProviderId() {
+        return providerId;
+    }
+
+    public void setProviderId(String providerId) {
+        this.providerId = providerId;
     }
 }

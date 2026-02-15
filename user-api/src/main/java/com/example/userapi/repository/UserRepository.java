@@ -1,6 +1,7 @@
 package com.example.userapi.repository;
 
 import com.example.userapi.entity.User;
+import com.example.userapi.enums.AuthProvider;
 import com.example.userapi.enums.UserStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,4 +22,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> findByStatusNot(UserStatus status, Pageable pageable);
 
     Optional<User> findByIdAndStatusNot(Long id, UserStatus status);
+
+    Optional<User> findByProviderAndProviderId(AuthProvider provider, String providerId);
 }

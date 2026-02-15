@@ -22,7 +22,11 @@ public class PageController {
     }
 
     @GetMapping("/login")
-    public String loginPage() {
+    public String loginPage(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session != null && session.getAttribute("user") != null) {
+            return "redirect:/dashboard";
+        }
         return "login";
     }
 
