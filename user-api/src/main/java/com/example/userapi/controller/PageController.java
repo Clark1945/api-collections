@@ -145,6 +145,7 @@ public class PageController {
             return "redirect:/dashboard";
         }
 
+        SecurityContextHolder.clearContext();
         session.invalidate();
         redirectAttributes.addFlashAttribute("success", "帳號已刪除");
         return "redirect:/login";

@@ -79,6 +79,12 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
         <!-- SpringDoc OpenAPI (Swagger UI) -->
         <dependency>
             <groupId>org.springdoc</groupId>
