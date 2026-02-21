@@ -1,6 +1,7 @@
 package com.example.userapi.aspect;
 
 import com.example.userapi.entity.User;
+import com.example.userapi.entity.Wallet;
 import com.example.userapi.service.AuditLogService;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
@@ -25,7 +26,8 @@ public class AuditLoggingAspect {
 
     @AfterReturning(pointcut = "@annotation(auditable)", returning = "result")
     public void auditLog(JoinPoint joinPoint, Auditable auditable, Object result) {
-        if (!(result instanceof User user)) {
+        User user = extractUser(result);
+        if (user == null) {
             return;
         }
 
@@ -38,5 +40,15 @@ public class AuditLoggingAspect {
         }
 
         auditLogService.log(user, auditable.eventType(), detail);
+    }
+
+    private User extractUser(Object result) {
+        if (result instanceof User user) {
+            return user;
+        }
+        if (result instanceof Wallet wallet) {
+            return wallet.getUser();
+        }
+        return null;
     }
 }

@@ -30,15 +30,17 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final WalletService walletService;
 
     public UserService(UserRepository userRepository,
                        RoleRepository roleRepository,
                        UserRoleRepository userRoleRepository,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder, WalletService walletService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.userRoleRepository = userRoleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.walletService = walletService;
     }
 
     @Transactional
@@ -137,5 +139,23 @@ public class UserService {
         user.setRoles(userRoles);
 
         return user;
+    }
+
+    public void register(String username, String email, String password, UserStatus userStatus) {
+        if (userRepository.existsByUsername(username)) {
+            throw new DuplicateResourceException("User", "username", username);
+        }
+        if (userRepository.existsByEmail(email)) {
+            throw new DuplicateResourceException("User", "email", email);
+        }
+
+        User user = new User();
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setStatus(UserStatus.ENABLED);
+        user = userRepository.save(user);
+
+        walletService.createWalletForUser(user);
     }
 }

@@ -13,13 +13,25 @@
         .info-table td { padding: 0.6rem 0; border-bottom: 1px solid #eee; font-size: 0.95rem; }
         .info-table td:first-child { color: #888; width: 40%; }
         .info-table td:last-child { color: #333; }
+        .nav-links { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+        .nav-links a { color: #4a90d9; text-decoration: none; font-size: 0.95rem; padding: 0.5rem 1rem; border: 1px solid #4a90d9; border-radius: 4px; }
+        .nav-links a:hover { background: #4a90d9; color: #fff; }
         .btn-logout { padding: 0.6rem 1.5rem; background: #e74c3c; color: #fff; border: none; border-radius: 4px; font-size: 0.95rem; cursor: pointer; }
         .btn-logout:hover { background: #c0392b; }
+        .btn-delete { padding: 0.6rem 1.5rem; background: #95a5a6; color: #fff; border: none; border-radius: 4px; font-size: 0.95rem; cursor: pointer; margin-left: 0.5rem; }
+        .btn-delete:hover { background: #7f8c8d; }
+        .actions { display: flex; align-items: center; }
     </style>
 </head>
 <body>
 <div class="card">
     <h1>歡迎, <span th:text="${user.username}"></span></h1>
+
+    <div class="nav-links">
+        <a th:href="@{/wallet}">我的錢包</a>
+        <a th:href="@{/stocks}">股票追蹤</a>
+    </div>
+
     <table class="info-table">
         <tr>
             <td>Email</td>
@@ -30,6 +42,10 @@
             <td th:text="${user.status.description}"></td>
         </tr>
         <tr>
+            <td>錢包餘額</td>
+            <td>NT$ <span th:text="${walletBalance}"></span></td>
+        </tr>
+        <tr>
             <td>上次登入時間</td>
             <td th:text="${user.lastLoginAt != null ? user.lastLoginAt.toString() : '首次登入'}"></td>
         </tr>
@@ -38,9 +54,21 @@
             <td th:text="${user.lastLoginIp != null ? user.lastLoginIp : '-'}"></td>
         </tr>
     </table>
-    <form method="post" th:action="@{/logout}">
-        <button type="submit" class="btn-logout">登出</button>
-    </form>
+    <div class="actions">
+        <form method="post" th:action="@{/logout}">
+            <button type="submit" class="btn-logout">登出</button>
+        </form>
+        <form method="post" th:action="@{/account/delete}" id="deleteForm">
+            <button type="button" class="btn-delete" onclick="confirmDelete()">刪除帳號</button>
+        </form>
+    </div>
 </div>
+<script>
+    function confirmDelete() {
+        if (confirm('確定要刪除帳號嗎？此操作無法復原。')) {
+            document.getElementById('deleteForm').submit();
+        }
+    }
+</script>
 </body>
 </html>

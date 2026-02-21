@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票追蹤</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 2rem; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .nav { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+        .nav a { color: #4a90d9; text-decoration: none; font-size: 0.95rem; }
+        .nav a:hover { text-decoration: underline; }
+        .card { background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }
+        .card h2 { margin-bottom: 1rem; color: #333; font-size: 1.3rem; }
+        .form-row { display: flex; gap: 0.8rem; align-items: flex-end; margin-bottom: 1rem; }
+        .form-row .field { flex: 1; }
+        .form-row label { display: block; margin-bottom: 0.3rem; color: #555; font-size: 0.85rem; }
+        .form-row input { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.95rem; }
+        .form-row input:focus { outline: none; border-color: #4a90d9; }
+        .btn { padding: 0.6rem 1.2rem; border: none; border-radius: 4px; font-size: 0.95rem; cursor: pointer; color: #fff; }
+        .btn-blue { background: #4a90d9; }
+        .btn-blue:hover { background: #357abd; }
+        .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.85rem; background: #e74c3c; }
+        .btn-sm:hover { background: #c0392b; }
+        .msg { padding: 0.7rem; border-radius: 4px; margin-bottom: 1rem; font-size: 0.9rem; text-align: center; display: none; }
+        .msg-ok { background: #eafaf1; color: #27ae60; }
+        .msg-err { background: #fef0f0; color: #c0392b; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.6rem; text-align: right; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+        th { color: #888; font-weight: 500; }
+        td:first-child, th:first-child { text-align: left; }
+        td:last-child, th:last-child { text-align: center; }
+        .up { color: #c0392b; }
+        .down { color: #27ae60; }
+        .flat { color: #888; }
+        .sse-status { font-size: 0.8rem; color: #888; margin-bottom: 0.5rem; }
+        .sse-status .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+        .dot-on { background: #27ae60; }
+        .dot-off { background: #e74c3c; }
+        canvas { width: 100%; height: 250px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="nav">
+        <a th:href="@{/dashboard}">儀表板</a>
+        <a th:href="@{/wallet}">我的錢包</a>
+    </div>
+
+    <div class="card">
+        <h2>股票追蹤</h2>
+        <div class="sse-status"><span class="dot dot-off" id="sseDot"></span><span id="sseText">未連線</span></div>
+        <div class="msg msg-ok" id="msgOk"></div>
+        <div class="msg msg-err" id="msgErr"></div>
+
+        <div class="form-row">
+            <div class="field">
+                <label for="symbolInput">股票代號</label>
+                <input type="text" id="symbolInput" placeholder="例如 2330" maxlength="6">
+            </div>
+            <button class="btn btn-blue" onclick="addStock()">加入追蹤</button>
+        </div>
+
+        <table>
+            <thead>
+            <tr>
+                <th>代號</th><th>名稱</th><th>現價</th><th>漲跌</th><th>漲跌幅</th>
+                <th>成交量</th><th>最高</th><th>最低</th><th>開盤</th><th>昨收</th><th>操作</th>
+            </tr>
+            </thead>
+            <tbody id="stockBody">
+            <tr><td colspan="11" style="text-align:center;color:#888;">尚無追蹤股票</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>走勢圖</h2>
+        <canvas id="chart"></canvas>
+    </div>
+</div>
+
+<script>
+    var watchlist = {};
+    var priceHistory = {};
+    var maxPoints = 100;
+
+    function showMsg(type, text) {
+        var ok = document.getElementById('msgOk'), err = document.getElementById('msgErr');
+        ok.style.display = 'none'; err.style.display = 'none';
+        if (type === 'ok') { ok.textContent = text; ok.style.display = 'block'; }
+        else { err.textContent = text; err.style.display = 'block'; }
+        setTimeout(function() { ok.style.display = 'none'; err.style.display = 'none'; }, 3000);
+    }
+
+    function addStock() {
+        var symbol = document.getElementById('symbolInput').value.trim();
+        if (!/^[0-9]{4,6}$/.test(symbol)) { showMsg('err', '股票代號格式不正確（需為 4-6 位數字）'); return; }
+        fetch('/api/v1/stocks/watchlist', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({stockSymbol: symbol})
+        }).then(function(r) { if (!r.ok) return r.json().then(function(e) { throw e; }); return r.json(); })
+        .then(function(data) {
+            document.getElementById('symbolInput').value = '';
+            showMsg('ok', '已加入追蹤: ' + data.stockSymbol + ' ' + data.stockName);
+            loadWatchlist();
+        }).catch(function(e) { showMsg('err', e.message || '加入追蹤失敗'); });
+    }
+
+    function removeStock(symbol) {
+        fetch('/api/v1/stocks/watchlist/' + symbol, { method: 'DELETE' })
+        .then(function(r) { if (!r.ok) throw new Error('移除失敗'); })
+        .then(function() {
+            showMsg('ok', '已移除追蹤: ' + symbol);
+            delete watchlist[symbol];
+            delete priceHistory[symbol];
+            renderTable();
+            drawChart();
+        }).catch(function(e) { showMsg('err', e.message); });
+    }
+
+    function loadWatchlist() {
+        fetch('/api/v1/stocks/watchlist').then(function(r) { return r.json(); })
+        .then(function(data) {
+            watchlist = {};
+            data.forEach(function(item) {
+                watchlist[item.stockSymbol] = { symbol: item.stockSymbol, name: item.stockName };
+            });
+            renderTable();
+        });
+    }
+
+    function renderTable() {
+        var body = document.getElementById('stockBody');
+        var symbols = Object.keys(watchlist);
+        if (symbols.length === 0) {
+            body.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#888;">尚無追蹤股票</td></tr>';
+            return;
+        }
+        body.innerHTML = '';
+        symbols.forEach(function(sym) {
+            var s = watchlist[sym];
+            var tr = document.createElement('tr');
+            tr.id = 'row-' + sym;
+            var change = parseFloat(s.changePrice || 0);
+            var cls = change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
+            var arrow = change > 0 ? '\u25B2' : change < 0 ? '\u25BC' : '';
+            tr.innerHTML = '<td>' + sym + '</td>'
+                + '<td style="text-align:left">' + (s.name || '-') + '</td>'
+                + '<td class="' + cls + '">' + (s.currentPrice || '-') + '</td>'
+                + '<td class="' + cls + '">' + arrow + ' ' + (s.changePrice || '-') + '</td>'
+                + '<td class="' + cls + '">' + (s.changePercent ? s.changePercent + '%' : '-') + '</td>'
+                + '<td>' + (s.volume || '-') + '</td>'
+                + '<td>' + (s.highPrice || '-') + '</td>'
+                + '<td>' + (s.lowPrice || '-') + '</td>'
+                + '<td>' + (s.openPrice || '-') + '</td>'
+                + '<td>' + (s.previousClose || '-') + '</td>'
+                + '<td><button class="btn btn-sm" onclick="removeStock(\'' + sym + '\')">移除</button></td>';
+            body.appendChild(tr);
+        });
+    }
+
+    // SSE
+    var evtSource = null;
+    function connectSSE() {
+        if (evtSource) evtSource.close();
+        evtSource = new EventSource('/api/v1/stocks/sse');
+        evtSource.addEventListener('stock-update', function(e) {
+            var quotes = JSON.parse(e.data);
+            quotes.forEach(function(q) {
+                if (watchlist[q.stockSymbol]) {
+                    Object.assign(watchlist[q.stockSymbol], q);
+                    // Track price history
+                    if (!priceHistory[q.stockSymbol]) priceHistory[q.stockSymbol] = [];
+                    var price = parseFloat(q.currentPrice);
+                    if (!isNaN(price)) {
+                        priceHistory[q.stockSymbol].push({ time: new Date(), price: price });
+                        if (priceHistory[q.stockSymbol].length > maxPoints) {
+                            priceHistory[q.stockSymbol].shift();
+                        }
+                    }
+                }
+            });
+            renderTable();
+            drawChart();
+        });
+        evtSource.onopen = function() {
+            document.getElementById('sseDot').className = 'dot dot-on';
+            document.getElementById('sseText').textContent = '即時連線中';
+        };
+        evtSource.onerror = function() {
+            document.getElementById('sseDot').className = 'dot dot-off';
+            document.getElementById('sseText').textContent = '連線中斷，重新連線中...';
+        };
+    }
+
+    // Chart drawing
+    function drawChart() {
+        var canvas = document.getElementById('chart');
+        var ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth;
+        canvas.height = 250;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        var symbols = Object.keys(priceHistory).filter(function(s) { return priceHistory[s].length > 1; });
+        if (symbols.length === 0) {
+            ctx.fillStyle = '#888';
+            ctx.font = '14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('等待即時數據中...', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+
+        var colors = ['#e74c3c', '#3498db', '#27ae60', '#f39c12', '#9b59b6', '#1abc9c'];
+        var padding = { top: 20, right: 20, bottom: 30, left: 60 };
+        var w = canvas.width - padding.left - padding.right;
+        var h = canvas.height - padding.top - padding.bottom;
+
+        // Find global min/max
+        var allPrices = [];
+        symbols.forEach(function(s) {
+            priceHistory[s].forEach(function(p) { allPrices.push(p.price); });
+        });
+        var minP = Math.min.apply(null, allPrices);
+        var maxP = Math.max.apply(null, allPrices);
+        if (minP === maxP) { minP -= 1; maxP += 1; }
+        var maxLen = 0;
+        symbols.forEach(function(s) { maxLen = Math.max(maxLen, priceHistory[s].length); });
+
+        // Grid
+        ctx.strokeStyle = '#eee';
+        ctx.lineWidth = 1;
+        for (var i = 0; i <= 4; i++) {
+            var y = padding.top + (h / 4) * i;
+            ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(padding.left + w, y); ctx.stroke();
+            ctx.fillStyle = '#888'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText((maxP - (maxP - minP) * i / 4).toFixed(1), padding.left - 5, y + 4);
+        }
+
+        // Lines
+        symbols.forEach(function(sym, idx) {
+            var points = priceHistory[sym];
+            ctx.strokeStyle = colors[idx % colors.length];
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            points.forEach(function(p, j) {
+                var x = padding.left + (j / (maxLen - 1)) * w;
+                var y = padding.top + (1 - (p.price - minP) / (maxP - minP)) * h;
+                if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Legend
+            ctx.fillStyle = colors[idx % colors.length];
+            ctx.font = '12px sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText(sym + ' ' + (watchlist[sym] ? watchlist[sym].name : ''), padding.left + idx * 120, canvas.height - 5);
+        });
+    }
+
+    document.getElementById('symbolInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') addStock();
+    });
+
+    loadWatchlist();
+    connectSSE();
+</script>
+</body>
+</html>

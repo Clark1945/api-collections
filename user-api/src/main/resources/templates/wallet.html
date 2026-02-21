@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的錢包</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 2rem; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .nav { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+        .nav a { color: #4a90d9; text-decoration: none; font-size: 0.95rem; }
+        .nav a:hover { text-decoration: underline; }
+        .card { background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }
+        .card h2 { margin-bottom: 1rem; color: #333; font-size: 1.3rem; }
+        .balance { font-size: 2rem; color: #27ae60; font-weight: bold; margin-bottom: 0.5rem; }
+        .form-row { display: flex; gap: 0.8rem; margin-bottom: 1rem; align-items: flex-end; }
+        .form-row .field { flex: 1; }
+        .form-row label { display: block; margin-bottom: 0.3rem; color: #555; font-size: 0.85rem; }
+        .form-row input { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.95rem; }
+        .form-row input:focus { outline: none; border-color: #4a90d9; }
+        .btn { padding: 0.6rem 1.2rem; border: none; border-radius: 4px; font-size: 0.95rem; cursor: pointer; color: #fff; }
+        .btn-green { background: #27ae60; }
+        .btn-green:hover { background: #219a52; }
+        .btn-red { background: #e74c3c; }
+        .btn-red:hover { background: #c0392b; }
+        .msg { padding: 0.7rem; border-radius: 4px; margin-bottom: 1rem; font-size: 0.9rem; text-align: center; display: none; }
+        .msg-ok { background: #eafaf1; color: #27ae60; }
+        .msg-err { background: #fef0f0; color: #c0392b; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.6rem; text-align: left; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+        th { color: #888; font-weight: 500; }
+        .type-topup { color: #27ae60; }
+        .type-payment { color: #e74c3c; }
+        .pagination { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: center; }
+        .pagination button { padding: 0.4rem 0.8rem; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; }
+        .pagination button:hover { background: #f5f5f5; }
+        .pagination button:disabled { opacity: 0.5; cursor: default; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="nav">
+        <a th:href="@{/dashboard}">儀表板</a>
+        <a th:href="@{/stocks}">股票追蹤</a>
+    </div>
+
+    <div class="card">
+        <h2>我的錢包</h2>
+        <div class="balance" id="balance">載入中...</div>
+        <div class="msg msg-ok" id="msgOk"></div>
+        <div class="msg msg-err" id="msgErr"></div>
+
+        <h3 style="margin: 1rem 0 0.5rem; font-size: 1rem; color: #555;">儲值</h3>
+        <div class="form-row">
+            <div class="field">
+                <label for="topUpAmount">金額</label>
+                <input type="number" id="topUpAmount" min="1" step="0.01" placeholder="輸入儲值金額">
+            </div>
+            <button class="btn btn-green" onclick="doTopUp()">儲值</button>
+        </div>
+
+        <h3 style="margin: 1rem 0 0.5rem; font-size: 1rem; color: #555;">付款</h3>
+        <div class="form-row">
+            <div class="field">
+                <label for="payAmount">金額</label>
+                <input type="number" id="payAmount" min="0.01" step="0.01" placeholder="輸入付款金額">
+            </div>
+            <div class="field">
+                <label for="payDesc">描述</label>
+                <input type="text" id="payDesc" placeholder="付款描述（選填）">
+            </div>
+            <button class="btn btn-red" onclick="doPayment()">付款</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>交易紀錄</h2>
+        <table>
+            <thead>
+            <tr><th>時間</th><th>類型</th><th>金額</th><th>餘額</th><th>描述</th></tr>
+            </thead>
+            <tbody id="txBody"></tbody>
+        </table>
+        <div class="pagination">
+            <button id="prevBtn" onclick="loadTx(currentPage-1)" disabled>上一頁</button>
+            <span id="pageInfo"></span>
+            <button id="nextBtn" onclick="loadTx(currentPage+1)" disabled>下一頁</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    var currentPage = 0;
+
+    function showMsg(type, text) {
+        var ok = document.getElementById('msgOk'), err = document.getElementById('msgErr');
+        ok.style.display = 'none'; err.style.display = 'none';
+        if (type === 'ok') { ok.textContent = text; ok.style.display = 'block'; }
+        else { err.textContent = text; err.style.display = 'block'; }
+        setTimeout(function() { ok.style.display = 'none'; err.style.display = 'none'; }, 3000);
+    }
+
+    function loadWallet() {
+        fetch('/api/v1/wallet').then(function(r) { return r.json(); }).then(function(data) {
+            document.getElementById('balance').textContent = 'NT$ ' + Number(data.balance).toLocaleString('zh-TW', {minimumFractionDigits: 2});
+        }).catch(function() {
+            document.getElementById('balance').textContent = 'NT$ 0.00';
+        });
+    }
+
+    function doTopUp() {
+        var amount = document.getElementById('topUpAmount').value;
+        if (!amount || Number(amount) < 1) { showMsg('err', '儲值金額至少為 1.00'); return; }
+        fetch('/api/v1/wallet/top-up', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({amount: amount})
+        }).then(function(r) { if (!r.ok) return r.json().then(function(e) { throw e; }); return r.json(); })
+        .then(function(data) {
+            document.getElementById('balance').textContent = 'NT$ ' + Number(data.balance).toLocaleString('zh-TW', {minimumFractionDigits: 2});
+            document.getElementById('topUpAmount').value = '';
+            showMsg('ok', '儲值成功');
+            loadTx(0);
+        }).catch(function(e) { showMsg('err', e.message || '儲值失敗'); });
+    }
+
+    function doPayment() {
+        var amount = document.getElementById('payAmount').value;
+        var desc = document.getElementById('payDesc').value;
+        if (!amount || Number(amount) < 0.01) { showMsg('err', '付款金額至少為 0.01'); return; }
+        fetch('/api/v1/wallet/payment', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({amount: amount, description: desc || null})
+        }).then(function(r) { if (!r.ok) return r.json().then(function(e) { throw e; }); return r.json(); })
+        .then(function(data) {
+            document.getElementById('balance').textContent = 'NT$ ' + Number(data.balance).toLocaleString('zh-TW', {minimumFractionDigits: 2});
+            document.getElementById('payAmount').value = '';
+            document.getElementById('payDesc').value = '';
+            showMsg('ok', '付款成功');
+            loadTx(0);
+        }).catch(function(e) { showMsg('err', e.message || '付款失敗'); });
+    }
+
+    function loadTx(page) {
+        fetch('/api/v1/wallet/transactions?page=' + page + '&size=10')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            currentPage = data.number;
+            var body = document.getElementById('txBody');
+            body.innerHTML = '';
+            data.content.forEach(function(tx) {
+                var tr = document.createElement('tr');
+                var typeClass = tx.type === 'TOP_UP' ? 'type-topup' : 'type-payment';
+                var typeLabel = tx.type === 'TOP_UP' ? '儲值' : '付款';
+                var sign = tx.type === 'TOP_UP' ? '+' : '-';
+                tr.innerHTML = '<td>' + new Date(tx.createdAt).toLocaleString('zh-TW') + '</td>'
+                    + '<td class="' + typeClass + '">' + typeLabel + '</td>'
+                    + '<td class="' + typeClass + '">' + sign + Number(tx.amount).toFixed(2) + '</td>'
+                    + '<td>' + Number(tx.balanceAfter).toFixed(2) + '</td>'
+                    + '<td>' + (tx.description || '-') + '</td>';
+                body.appendChild(tr);
+            });
+            document.getElementById('prevBtn').disabled = data.first;
+            document.getElementById('nextBtn').disabled = data.last;
+            document.getElementById('pageInfo').textContent = (data.number + 1) + ' / ' + (data.totalPages || 1);
+        });
+    }
+
+    loadWallet();
+    loadTx(0);
+</script>
+</body>
+</html>
